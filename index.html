@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>三關語詞發音學習</title>
+<meta name="theme-color" content="#5d8fd8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="語詞發音學習">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+<style>
+:root{--blue:#5d8fd8;--blue2:#eaf3ff;--green:#45b97c;--red:#ef5350;--ink:#263238;--card:#fff;--shadow:0 10px 30px #4562a31c}
+*{box-sizing:border-box} body{margin:0;font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;background:#f5f9ff;color:var(--ink)}
+button,input{font:inherit} button{cursor:pointer}
+.app{min-height:100vh;display:flex}
+.sidebar{width:310px;background:white;border-right:1px solid #dce8f7;padding:20px;transition:.25s;position:fixed;z-index:10;left:0;top:0;bottom:0;overflow:auto}
+.sidebar.closed{transform:translateX(-310px)}
+.side-toggle{position:fixed;z-index:20;left:310px;top:18px;border:0;background:var(--blue);color:white;width:44px;height:44px;border-radius:0 14px 14px 0;font-size:22px;transition:.25s}
+.sidebar.closed+.side-toggle{left:0}
+h2{margin:0 0 8px}.hint{font-size:13px;color:#607d8b;line-height:1.6}
+.editor{margin-top:18px;padding-top:18px;border-top:1px solid #e6eef8}.editor h3{font-size:16px}
+.field{margin:12px 0}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
+.field input[type=text]{width:100%;padding:10px;border:1px solid #ccd9ea;border-radius:10px}
+.btn{border:0;border-radius:12px;padding:10px 12px;background:var(--blue2);color:#315b94;font-weight:700}
+.btn.primary{background:var(--blue);color:white}.btn.danger{background:#fff0ef;color:#c73e3a}
+.row{display:flex;gap:8px;flex-wrap:wrap}.status{font-size:12px;margin-top:6px;color:#607d8b}
+.preview{width:100%;aspect-ratio:4/3;object-fit:contain;background:#f6f8fb;border:1px dashed #b7c9df;border-radius:12px}
+main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transition:.25s}
+.sidebar.closed~main{margin-left:0}
+.top{display:flex;justify-content:center;gap:14px;margin-bottom:24px;padding-left:42px}
+.stage-thumb{width:120px;background:white;border:3px solid #d6e3f2;border-radius:18px;padding:8px;opacity:.65;transition:.25s}
+.stage-thumb.active{border-color:var(--blue);opacity:1;transform:translateY(-2px)}
+.stage-thumb.done{border-color:var(--green);opacity:1;box-shadow:0 0 0 4px #45b97c20}
+.stage-thumb img{width:100%;height:68px;object-fit:contain}.stage-thumb span{display:block;text-align:center;font-weight:800}
+.learning-card{max-width:760px;margin:0 auto;background:white;border-radius:28px;padding:28px;box-shadow:var(--shadow);text-align:center;position:relative}
+.badge{display:inline-block;background:#e9f3ff;color:#376cae;padding:8px 14px;border-radius:999px;font-weight:800}
+.target-img{width:min(430px,75vw);height:360px;object-fit:contain;margin:12px auto 4px;display:block;cursor:pointer;border-radius:24px}
+.word{font-size:42px;font-weight:900;letter-spacing:4px;margin:2px 0 10px}
+.instruction{color:#607d8b;margin-bottom:18px}
+.mic{width:96px;height:96px;border:0;border-radius:50%;background:#ff6b6b;color:white;font-size:42px;box-shadow:0 10px 25px #ff6b6b55}
+.mic.listening{animation:pulse 1s infinite;background:#ef3e3e}@keyframes pulse{50%{transform:scale(1.08)}}
+.feedback{min-height:70px;margin-top:18px;font-size:23px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.check{font-size:86px;color:var(--red);font-weight:1000;animation:pop .35s ease}@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.controls{display:flex;justify-content:center;gap:10px;margin-top:12px}
+@media(max-width:760px){.sidebar{width:290px}.sidebar.closed{transform:translateX(-290px)}.side-toggle{left:290px}main{margin-left:0;padding:16px 10px}.top{padding-left:45px;gap:6px}.stage-thumb{width:30%;}.stage-thumb img{height:48px}.learning-card{padding:20px 12px}.target-img{height:290px}.word{font-size:34px}}
+</style>
+
+<style>
+.pwa-tools{position:fixed;right:14px;top:14px;z-index:30;display:flex;gap:8px}
+.pwa-install,.pwa-update{display:none;border:0;border-radius:999px;padding:10px 14px;background:#263238;color:#fff;font-weight:800;box-shadow:0 6px 18px #0002}
+.pwa-update{background:#45b97c}
+</style>
+</head>
+<body>
+<div class="pwa-tools">
+<button class="pwa-install" id="installApp">＋ 安裝 App</button>
+<button class="pwa-update" id="updateApp">↻ 有新版本</button>
+</div>
+<div class="app">
+<aside class="sidebar" id="sidebar">
+  <h2>👩‍🏫 老師編輯區</h2>
+  <div class="hint">每一關都可以更換圖片、修改語詞，並錄製「點圖片時要播放」的示範語音。設定會保存在這台裝置的瀏覽器中。</div>
+  <div class="editor">
+    <h3 id="editTitle">編輯第一關</h3>
+    <div class="field"><label>語詞</label><input id="wordInput" type="text"></div>
+    <div class="field"><label>圖片（拍照或從相簿／電腦匯入）</label><input id="imageInput" type="file" accept="image/*" capture="environment"><div style="height:8px"></div><img class="preview" id="preview"></div>
+    <div class="field"><label>示範錄音</label>
+      <div class="row"><button class="btn primary" id="recordBtn">🔴 開始錄音</button><button class="btn" id="playBtn">▶ 播放錄音</button><button class="btn danger" id="deleteAudio">刪除錄音</button></div>
+      <div class="status" id="recordStatus">尚未錄音</div>
+    </div>
+    <button class="btn primary" id="saveBtn" style="width:100%">💾 儲存本關設定</button>
+  </div>
+  <div class="editor">
+    <h3>辨識設定</h3>
+    <div class="hint">按主畫面的麥克風後，瀏覽器會嘗試辨識孩子說的語詞。若裝置不支援語音辨識，可使用下方「老師判定」按鈕。</div>
+  </div>
+</aside>
+<button class="side-toggle" id="toggle">☰</button>
+<main>
+  <div class="top" id="stageBar"></div>
+  <section class="learning-card">
+    <div class="badge" id="badge">第一關</div>
+    <img id="targetImg" class="target-img" alt="學習圖片">
+    <div class="word" id="targetWord"></div>
+    <div class="instruction">點圖片可以聽老師的示範錄音，再按麥克風說出圖片中的語詞。</div>
+    <button class="mic" id="micBtn" title="開始語音辨識">🎤</button>
+    <div class="feedback" id="feedback">準備好就開始吧！</div>
+    <div class="controls">
+      <button class="btn" id="retryBtn">↻ 再試一次</button>
+      <button class="btn danger" id="wrongBtn">老師判定：再試試</button>
+      <button class="btn primary" id="correctBtn">老師判定：答對</button>
+    </div>
+  </section>
+</main>
+</div>
+<script>
+const defaultSVG=(emoji,label,bg)=>`data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450"><rect width="600" height="450" rx="40" fill="${bg}"/><text x="300" y="245" text-anchor="middle" font-size="190">${emoji}</text><text x="300" y="390" text-anchor="middle" font-size="48" font-family="sans-serif" font-weight="700" fill="#30445b">${label}</text></svg>`)}`;
+let stages=[
+ {word:"背包",image:defaultSVG("🎒","背包","#eaf4ff"),audio:null},
+ {word:"餐袋",image:defaultSVG("👜","餐袋","#fff5df"),audio:null},
+ {word:"水壺",image:defaultSVG("🧴","水壺","#e8fff4"),audio:null}
+];
+let current=0,done=[false,false,false],mediaRecorder,chunks=[],audioURL=null;
+try{const s=JSON.parse(localStorage.getItem("three-stage-settings")); if(s) stages=s;}catch(e){}
+const $=id=>document.getElementById(id);
+function render(){
+ $("stageBar").innerHTML=stages.map((s,i)=>`<button class="stage-thumb ${i===current?"active":""} ${done[i]?"done":""}" data-i="${i}"><img src="${s.image}"><span>${done[i]?"✓ ":""}第${["一","二","三"][i]}關</span></button>`).join("");
+ document.querySelectorAll(".stage-thumb").forEach(b=>b.onclick=()=>{current=+b.dataset.i; resetFeedback(); render();});
+ $("badge").textContent=`第${["一","二","三"][current]}關`;
+ $("targetImg").src=stages[current].image;$("targetWord").textContent=stages[current].word;
+ $("editTitle").textContent=`編輯第${["一","二","三"][current]}關`;
+ $("wordInput").value=stages[current].word;$("preview").src=stages[current].image;
+ $("recordStatus").textContent=stages[current].audio?"已有錄音，可播放或重新錄製":"尚未錄音";
+}
+function speak(text){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="zh-TW";u.rate=.92;speechSynthesis.speak(u)}
+function ding(){const A=window.AudioContext||window.webkitAudioContext;const c=new A(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.25,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.35);o.start();o.stop(c.currentTime+.35)}
+function wrong(){const arr=["沒關係，你可以再試試看","加油！我相信你能做到！"];const t=arr[Math.floor(Math.random()*arr.length)];$("feedback").textContent=t;speak(t)}
+function correct(){
+ if(done[current])return;done[current]=true;$("feedback").innerHTML='<div><div class="check">✔</div><div>答對了！</div></div>';ding();
+ setTimeout(()=>speak(Math.random()<.5?"答對了！":"你好棒！"),250);
+ const old=current; render();
+ if(old<2)setTimeout(()=>{current=old+1;resetFeedback();render()},1800);
+ else setTimeout(()=>{$("feedback").textContent="三關都完成了！你好棒！";speak("三關都完成了！你好棒！")},1500)
+}
+function resetFeedback(){$("feedback").textContent="準備好就開始吧！"}
+$("toggle").onclick=()=>{$("sidebar").classList.toggle("closed")};
+$("targetImg").onclick=()=>{let a=stages[current].audio;if(a)new Audio(a).play();else speak(stages[current].word)};
+$("retryBtn").onclick=()=>{resetFeedback();startRecognition()};
+$("wrongBtn").onclick=wrong;$("correctBtn").onclick=correct;
+$("imageInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$("preview").src=r.result};r.readAsDataURL(f)};
+$("saveBtn").onclick=()=>{stages[current].word=$("wordInput").value.trim()||stages[current].word;stages[current].image=$("preview").src;try{localStorage.setItem("three-stage-settings",JSON.stringify(stages))}catch(e){alert("圖片或錄音太大，瀏覽器無法完整儲存。可換較小的圖片。")}render();$("feedback").textContent="本關設定已儲存"};
+$("recordBtn").onclick=async()=>{
+ if(mediaRecorder&&mediaRecorder.state==="recording"){mediaRecorder.stop();return}
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];mediaRecorder=new MediaRecorder(stream);
+  mediaRecorder.ondataavailable=e=>chunks.push(e.data);mediaRecorder.onstop=()=>{const blob=new Blob(chunks,{type:mediaRecorder.mimeType});const r=new FileReader();r.onload=()=>{stages[current].audio=r.result;$("recordStatus").textContent="錄音完成，記得按「儲存本關設定」";$("recordBtn").textContent="🔴 開始錄音"};r.readAsDataURL(blob);stream.getTracks().forEach(t=>t.stop())};
+  mediaRecorder.start();$("recordBtn").textContent="⏹ 停止錄音";$("recordStatus").textContent="錄音中…";
+ }catch(e){alert("無法使用麥克風，請確認瀏覽器已允許麥克風權限。")}
+};
+$("playBtn").onclick=()=>{if(stages[current].audio)new Audio(stages[current].audio).play();else alert("這一關還沒有錄音")};
+$("deleteAudio").onclick=()=>{stages[current].audio=null;$("recordStatus").textContent="錄音已刪除，記得儲存"};
+function startRecognition(){
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){$("feedback").textContent="此瀏覽器不支援自動語音辨識，請由老師使用下方按鈕判定。";return}
+ const r=new SR();r.lang="zh-TW";r.interimResults=false;r.maxAlternatives=5;
+ $("micBtn").classList.add("listening");$("feedback").textContent="我在聽，請說出語詞…";
+ r.onresult=e=>{const heard=[...e.results[0]].map(x=>x.transcript.replace(/[，。！？\s]/g,""));const target=stages[current].word.replace(/\s/g,"");heard.some(x=>x.includes(target)||target.includes(x))?correct():wrong()};
+ r.onerror=()=>wrong();r.onend=()=>$("micBtn").classList.remove("listening");r.start();
+}
+$("micBtn").onclick=startRecognition;
+render();
+</script>
+
+<script>
+let deferredInstallPrompt=null;
+const installApp=document.getElementById("installApp");
+const updateApp=document.getElementById("updateApp");
+
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault(); deferredInstallPrompt=e; installApp.style.display="block";
+});
+installApp.addEventListener("click",async()=>{
+  if(!deferredInstallPrompt){
+    alert("iPhone / iPad：請按 Safari 的「分享」→「加入主畫面」。Android / 電腦：請使用 Chrome 或 Edge 的安裝選項。");
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt=null; installApp.style.display="none";
+});
+window.addEventListener("appinstalled",()=>installApp.style.display="none");
+
+if("serviceWorker" in navigator){
+ window.addEventListener("load",async()=>{
+   try{
+     const reg=await navigator.serviceWorker.register("./sw.js");
+     reg.addEventListener("updatefound",()=>{
+       const nw=reg.installing;
+       nw.addEventListener("statechange",()=>{
+         if(nw.state==="installed" && navigator.serviceWorker.controller){
+           updateApp.style.display="block";
+           updateApp.onclick=()=>{nw.postMessage({type:"SKIP_WAITING"});};
+         }
+       });
+     });
+     navigator.serviceWorker.addEventListener("controllerchange",()=>location.reload());
+   }catch(e){console.log("Service worker registration failed",e);}
+ });
+}
+</script>
+</body></html>
