@@ -53,6 +53,32 @@ main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transi
 .pwa-install,.pwa-update{display:none;border:0;border-radius:999px;padding:10px 14px;background:#263238;color:#fff;font-weight:800;box-shadow:0 6px 18px #0002}
 .pwa-update{background:#45b97c}
 </style>
+
+<style>
+/* V2 mobile / PWA refinements */
+@media (max-height: 850px) and (min-width: 761px){
+  .learning-card{padding:18px 24px}
+  .target-img{height:270px;margin-top:6px}
+  .word{font-size:34px;margin:0 0 6px}
+  .instruction{margin-bottom:10px}
+  .mic{width:82px;height:82px;font-size:36px}
+  .feedback{min-height:52px;margin-top:8px}
+}
+@media(max-width:760px){
+  .sidebar{width:min(92vw,340px)}
+  .sidebar.closed{transform:translateX(-100%)}
+  .side-toggle{left:min(92vw,340px)}
+  .sidebar.closed+.side-toggle{left:0}
+  main{padding:12px 8px 24px}
+  .top{margin-bottom:12px}
+  .learning-card{border-radius:20px;padding:15px 10px}
+  .target-img{height:245px;margin:6px auto 0}
+  .word{font-size:32px;margin:0 0 5px}
+  .instruction{font-size:14px;margin-bottom:10px}
+  .mic{width:82px;height:82px;font-size:36px}
+  .feedback{min-height:52px;margin-top:8px;font-size:20px}
+}
+</style>
 </head>
 <body>
 <div class="pwa-tools">
@@ -60,13 +86,13 @@ main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transi
 <button class="pwa-update" id="updateApp">↻ 有新版本</button>
 </div>
 <div class="app">
-<aside class="sidebar" id="sidebar">
+<aside class="sidebar closed" id="sidebar">
   <h2>👩‍🏫 老師編輯區</h2>
   <div class="hint">每一關都可以更換圖片、修改語詞，並錄製「點圖片時要播放」的示範語音。設定會保存在這台裝置的瀏覽器中。</div>
   <div class="editor">
     <h3 id="editTitle">編輯第一關</h3>
     <div class="field"><label>語詞</label><input id="wordInput" type="text"></div>
-    <div class="field"><label>圖片（拍照或從相簿／電腦匯入）</label><input id="imageInput" type="file" accept="image/*" capture="environment"><div style="height:8px"></div><img class="preview" id="preview"></div>
+    <div class="field"><label>圖片（iPhone 可從照片圖庫／檔案選擇；其他裝置可匯入圖片）</label><input id="imageInput" type="file" accept="image/*"><div style="height:8px"></div><img class="preview" id="preview"></div>
     <div class="field"><label>示範錄音</label>
       <div class="row"><button class="btn primary" id="recordBtn">🔴 開始錄音</button><button class="btn" id="playBtn">▶ 播放錄音</button><button class="btn danger" id="deleteAudio">刪除錄音</button></div>
       <div class="status" id="recordStatus">尚未錄音</div>
@@ -104,11 +130,21 @@ let stages=[
  {word:"水壺",image:defaultSVG("🧴","水壺","#e8fff4"),audio:null}
 ];
 let current=0,done=[false,false,false],mediaRecorder,chunks=[],audioURL=null;
-try{const s=JSON.parse(localStorage.getItem("three-stage-settings")); if(s) stages=s;}catch(e){}
+try{
+ const s=JSON.parse(localStorage.getItem("three-stage-settings")); if(s) stages=s;
+ const p=JSON.parse(localStorage.getItem("three-stage-progress"));
+ if(p){
+   if(Number.isInteger(p.current) && p.current>=0 && p.current<3) current=p.current;
+   if(Array.isArray(p.done) && p.done.length===3) done=p.done.map(Boolean);
+ }
+}catch(e){}
+function saveProgress(){
+ try{localStorage.setItem("three-stage-progress",JSON.stringify({current,done}));}catch(e){}
+}
 const $=id=>document.getElementById(id);
 function render(){
  $("stageBar").innerHTML=stages.map((s,i)=>`<button class="stage-thumb ${i===current?"active":""} ${done[i]?"done":""}" data-i="${i}"><img src="${s.image}"><span>${done[i]?"✓ ":""}第${["一","二","三"][i]}關</span></button>`).join("");
- document.querySelectorAll(".stage-thumb").forEach(b=>b.onclick=()=>{current=+b.dataset.i; resetFeedback(); render();});
+ document.querySelectorAll(".stage-thumb").forEach(b=>b.onclick=()=>{current=+b.dataset.i; saveProgress(); resetFeedback(); render();});
  $("badge").textContent=`第${["一","二","三"][current]}關`;
  $("targetImg").src=stages[current].image;$("targetWord").textContent=stages[current].word;
  $("editTitle").textContent=`編輯第${["一","二","三"][current]}關`;
@@ -119,10 +155,10 @@ function speak(text){speechSynthesis.cancel();const u=new SpeechSynthesisUtteran
 function ding(){const A=window.AudioContext||window.webkitAudioContext;const c=new A(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.25,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.35);o.start();o.stop(c.currentTime+.35)}
 function wrong(){const arr=["沒關係，你可以再試試看","加油！我相信你能做到！"];const t=arr[Math.floor(Math.random()*arr.length)];$("feedback").textContent=t;speak(t)}
 function correct(){
- if(done[current])return;done[current]=true;$("feedback").innerHTML='<div><div class="check">✔</div><div>答對了！</div></div>';ding();
+ if(done[current])return;done[current]=true;saveProgress();$("feedback").innerHTML='<div><div class="check">✔</div><div>答對了！</div></div>';ding();
  setTimeout(()=>speak(Math.random()<.5?"答對了！":"你好棒！"),250);
  const old=current; render();
- if(old<2)setTimeout(()=>{current=old+1;resetFeedback();render()},1800);
+ if(old<2)setTimeout(()=>{current=old+1;saveProgress();resetFeedback();render()},1800);
  else setTimeout(()=>{$("feedback").textContent="三關都完成了！你好棒！";speak("三關都完成了！你好棒！")},1500)
 }
 function resetFeedback(){$("feedback").textContent="準備好就開始吧！"}
@@ -130,8 +166,25 @@ $("toggle").onclick=()=>{$("sidebar").classList.toggle("closed")};
 $("targetImg").onclick=()=>{let a=stages[current].audio;if(a)new Audio(a).play();else speak(stages[current].word)};
 $("retryBtn").onclick=()=>{resetFeedback();startRecognition()};
 $("wrongBtn").onclick=wrong;$("correctBtn").onclick=correct;
-$("imageInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$("preview").src=r.result};r.readAsDataURL(f)};
-$("saveBtn").onclick=()=>{stages[current].word=$("wordInput").value.trim()||stages[current].word;stages[current].image=$("preview").src;try{localStorage.setItem("three-stage-settings",JSON.stringify(stages))}catch(e){alert("圖片或錄音太大，瀏覽器無法完整儲存。可換較小的圖片。")}render();$("feedback").textContent="本關設定已儲存"};
+$("imageInput").onchange=e=>{
+ const f=e.target.files[0]; if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{
+   const original=r.result, img=new Image();
+   img.onload=()=>{
+     try{
+       const max=1200, scale=Math.min(1,max/Math.max(img.width,img.height));
+       const c=document.createElement("canvas"); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
+       c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+       $("preview").src=c.toDataURL("image/jpeg",0.82);
+     }catch(err){$("preview").src=original}
+   };
+   img.onerror=()=>{$("preview").src=original};
+   img.src=original;
+ };
+ r.readAsDataURL(f)
+};
+$("saveBtn").onclick=()=>{saveProgress();stages[current].word=$("wordInput").value.trim()||stages[current].word;stages[current].image=$("preview").src;try{localStorage.setItem("three-stage-settings",JSON.stringify(stages))}catch(e){alert("圖片或錄音太大，瀏覽器無法完整儲存。可換較小的圖片。")}render();$("feedback").textContent="本關設定已儲存"};
 $("recordBtn").onclick=async()=>{
  if(mediaRecorder&&mediaRecorder.state==="recording"){mediaRecorder.stop();return}
  try{
