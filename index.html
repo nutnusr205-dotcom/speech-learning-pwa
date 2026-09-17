@@ -183,7 +183,7 @@ function render(){
  $("wordInput").value=stages[current].word;$("preview").src=stages[current].image;
  $("recordStatus").textContent=stages[current].audio?"已有錄音，可播放或重新錄製":"尚未錄音";
 }
-function speak(text){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="zh-TW";u.rate=.92;speechSynthesis.speak(u)}
+function speak(text){speechSynthesis.cancel();refreshZhVoice();const u=new SpeechSynthesisUtterance(text);u.lang="zh-TW";if(zhVoice)u.voice=zhVoice;u.rate=.8;speechSynthesis.speak(u)}
 function ding(){const A=window.AudioContext||window.webkitAudioContext;const c=new A(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.25,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.35);o.start();o.stop(c.currentTime+.35)}
 function wrong(){const arr=["沒關係，你可以再試試看","加油！我相信你能做到！"];const t=arr[Math.floor(Math.random()*arr.length)];$("feedback").textContent=t;feedbackSpeak(t)}
 function correct(){
@@ -251,7 +251,12 @@ let feedbackPrimed=false;
 function refreshZhVoice(){
   try{
     const vs=speechSynthesis.getVoices();
-    zhVoice=vs.find(v=>/^zh-TW/i.test(v.lang)) || vs.find(v=>/^zh/i.test(v.lang)) || null;
+    const femaleHints=["美佳","Mei-Jia","Meijia","HsiaoChen","Hsiao-Chen","小陳","Ting-Ting","婷婷","Mei","Sinji","Shelley"];
+    zhVoice=
+      vs.find(v=>/^zh-TW/i.test(v.lang) && femaleHints.some(n=>v.name.toLowerCase().includes(n.toLowerCase()))) ||
+      vs.find(v=>/^zh-TW/i.test(v.lang)) ||
+      vs.find(v=>/^zh/i.test(v.lang) && femaleHints.some(n=>v.name.toLowerCase().includes(n.toLowerCase()))) ||
+      vs.find(v=>/^zh/i.test(v.lang)) || null;
   }catch(e){}
 }
 refreshZhVoice();
@@ -282,7 +287,7 @@ function feedbackSpeak(text){
       const u=new SpeechSynthesisUtterance(text);
       u.lang="zh-TW";
       if(zhVoice)u.voice=zhVoice;
-      u.rate=.9; u.pitch=1; u.volume=1;
+      u.rate=.8; u.pitch=1; u.volume=1;
       synth.speak(u);
       setTimeout(()=>{try{synth.resume()}catch(e){}},120);
     }catch(e){}
