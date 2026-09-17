@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>三關語詞發音學習</title>
+<title>十關語詞發音學習</title>
 <meta name="theme-color" content="#5d8fd8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -127,9 +127,16 @@ const defaultSVG=(emoji,label,bg)=>`data:image/svg+xml;charset=utf-8,${encodeURI
 let stages=[
  {word:"背包",image:defaultSVG("🎒","背包","#eaf4ff"),audio:null},
  {word:"餐袋",image:defaultSVG("👜","餐袋","#fff5df"),audio:null},
- {word:"水壺",image:defaultSVG("🧴","水壺","#e8fff4"),audio:null}
+ {word:"水壺",image:defaultSVG("🧴","水壺","#e8fff4"),audio:null},
+ {word:"第4關",image:defaultSVG("4️⃣","第4關","#f4efff"),audio:null},
+ {word:"第5關",image:defaultSVG("5️⃣","第5關","#fff0f4"),audio:null},
+ {word:"第6關",image:defaultSVG("6️⃣","第6關","#effbf2"),audio:null},
+ {word:"第7關",image:defaultSVG("7️⃣","第7關","#fff8e8"),audio:null},
+ {word:"第8關",image:defaultSVG("8️⃣","第8關","#eef7ff"),audio:null},
+ {word:"第9關",image:defaultSVG("9️⃣","第9關","#f8f0ff"),audio:null},
+ {word:"第10關",image:defaultSVG("🔟","第10關","#f0fbff"),audio:null}
 ];
-let current=0,done=[false,false,false],mediaRecorder,chunks=[],audioURL=null;
+let current=0,done=Array(10).fill(false),mediaRecorder,chunks=[],audioURL=null;
 try{
  const s=JSON.parse(localStorage.getItem("three-stage-settings")); if(s) stages=s;
  localStorage.removeItem("three-stage-progress");
@@ -156,7 +163,7 @@ function correct(){
  feedbackSpeak(Math.random()<.5?"答對了！":"你好棒！");
  const old=current; render();
  if(old<2)setTimeout(()=>{current=old+1;resetFeedback();render()},1800);
- else setTimeout(()=>{$("feedback").textContent="三關都完成了！你好棒！";feedbackSpeak("三關都完成了！你好棒！")},1500)
+ else setTimeout(()=>{$("feedback").textContent="十關都完成了！你好棒！";feedbackSpeak("十關都完成了！你好棒！")},1500)
 }
 function resetFeedback(){$("feedback").textContent="準備好就開始吧！"}
 $("toggle").onclick=()=>{$("sidebar").classList.toggle("closed")};
