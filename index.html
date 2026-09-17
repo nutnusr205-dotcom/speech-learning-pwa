@@ -168,6 +168,29 @@ try{
 }catch(e){}
 function saveProgress(){ /* student progress is session-only */ }
 const $=id=>document.getElementById(id);
+function setupVoiceControls(){
+  const rate=$("voiceRate"), sel=$("voiceSelect"), test=$("voiceTestBtn");
+  if(rate){
+    rate.value=localStorage.getItem("speech-feedback-rate") || "0.8";
+    rate.onchange=()=>localStorage.setItem("speech-feedback-rate",rate.value);
+  }
+  refreshZhVoice();
+  if(sel) sel.onchange=()=>{
+    localStorage.setItem("speech-feedback-voice",sel.value);
+    zhVoice=selectedFeedbackVoice();
+  };
+  if(test) test.onclick=()=>{
+    try{
+      speechSynthesis.cancel(); speechSynthesis.resume();
+      const u=new SpeechSynthesisUtterance("你好棒！");
+      u.lang="zh-TW";
+      const v=selectedFeedbackVoice(); if(v)u.voice=v;
+      u.rate=selectedFeedbackRate(); u.pitch=1; u.volume=1;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  };
+}
+
 function keepActiveThumbVisible(){
  requestAnimationFrame(()=>{
   const a=document.querySelector(".stage-thumb.active");
@@ -251,13 +274,40 @@ let feedbackPrimed=false;
 function refreshZhVoice(){
   try{
     const vs=speechSynthesis.getVoices();
-    const femaleHints=["美佳","Mei-Jia","Meijia","HsiaoChen","Hsiao-Chen","小陳","Ting-Ting","婷婷","Mei","Sinji","Shelley"];
-    zhVoice=
-      vs.find(v=>/^zh-TW/i.test(v.lang) && femaleHints.some(n=>v.name.toLowerCase().includes(n.toLowerCase()))) ||
-      vs.find(v=>/^zh-TW/i.test(v.lang)) ||
-      vs.find(v=>/^zh/i.test(v.lang) && femaleHints.some(n=>v.name.toLowerCase().includes(n.toLowerCase()))) ||
-      vs.find(v=>/^zh/i.test(v.lang)) || null;
+    const saved=localStorage.getItem("speech-feedback-voice");
+    zhVoice=(saved && vs.find(v=>v.voiceURI===saved)) ||
+            vs.find(v=>/^zh-TW/i.test(v.lang)) ||
+            vs.find(v=>/^zh/i.test(v.lang)) || null;
+    refreshVoiceOptions();
   }catch(e){}
+}
+function refreshVoiceOptions(){
+  const sel=document.getElementById("voiceSelect");
+  if(!sel) return;
+  const vs=speechSynthesis.getVoices().filter(v=>/^zh/i.test(v.lang));
+  const saved=localStorage.getItem("speech-feedback-voice");
+  sel.innerHTML="";
+  if(!vs.length){
+    const o=document.createElement("option"); o.textContent="此裝置未提供中文網頁語音"; o.value=""; sel.appendChild(o); return;
+  }
+  vs.forEach(v=>{
+    const o=document.createElement("option");
+    o.value=v.voiceURI;
+    o.textContent=`${v.name}（${v.lang}）`;
+    if((saved && saved===v.voiceURI) || (!saved && zhVoice && zhVoice.voiceURI===v.voiceURI)) o.selected=true;
+    sel.appendChild(o);
+  });
+}
+function selectedFeedbackVoice(){
+  try{
+    const uri=document.getElementById("voiceSelect")?.value || localStorage.getItem("speech-feedback-voice");
+    const vs=speechSynthesis.getVoices();
+    return (uri && vs.find(v=>v.voiceURI===uri)) || zhVoice || vs.find(v=>/^zh-TW/i.test(v.lang)) || vs.find(v=>/^zh/i.test(v.lang)) || null;
+  }catch(e){return zhVoice}
+}
+function selectedFeedbackRate(){
+  const v=parseFloat(document.getElementById("voiceRate")?.value || localStorage.getItem("speech-feedback-rate") || "0.8");
+  return Number.isFinite(v)?v:0.8;
 }
 refreshZhVoice();
 if("speechSynthesis" in window) speechSynthesis.onvoiceschanged=refreshZhVoice;
@@ -271,7 +321,7 @@ function primeFeedbackSpeech(){
     synth.cancel(); synth.resume();
     const u=new SpeechSynthesisUtterance("\u200B");
     u.lang="zh-TW";
-    if(zhVoice)u.voice=zhVoice;
+    const chosen=selectedFeedbackVoice(); if(chosen)u.voice=chosen;
     u.volume=0.01; u.rate=1;
     synth.speak(u);
     feedbackPrimed=true;
@@ -286,8 +336,8 @@ function feedbackSpeak(text){
       synth.cancel(); synth.resume(); refreshZhVoice();
       const u=new SpeechSynthesisUtterance(text);
       u.lang="zh-TW";
-      if(zhVoice)u.voice=zhVoice;
-      u.rate=.8; u.pitch=1; u.volume=1;
+      const chosen=selectedFeedbackVoice(); if(chosen)u.voice=chosen;
+      u.rate=selectedFeedbackRate(); u.pitch=1; u.volume=1;
       synth.speak(u);
       setTimeout(()=>{try{synth.resume()}catch(e){}},120);
     }catch(e){}
@@ -366,6 +416,8 @@ function startRecognition(){
 $("micBtn").onclick=startRecognition;
 window.addEventListener("pagehide",stopRecognition);
 document.addEventListener("visibilitychange",()=>{if(document.hidden)stopRecognition();});
+setupVoiceControls();
+try{speechSynthesis.onvoiceschanged=()=>refreshZhVoice()}catch(e){}
 render();
 </script>
 
