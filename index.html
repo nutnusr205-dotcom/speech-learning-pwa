@@ -207,6 +207,20 @@ function stopRecognition(){
  $("micBtn").classList.remove("listening");
 }
 
+
+function speakAfterRecognition(text, delay=320){
+  stopRecognition();
+  setTimeout(()=>{
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);
+      u.lang="zh-TW";
+      u.rate=0.92;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  },delay);
+}
+
 async function warmUpMic(){
  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
@@ -243,7 +257,7 @@ async function startRecognition(){
    if(!gotResult){
      stopRecognition();
      $("feedback").textContent="剛剛沒有收到聲音，請再按一次麥克風試試看。";
-     speak("沒關係，請再試一次");
+     speakAfterRecognition(Math.random()<0.5?"沒關係，你可以再試試看":"加油！我相信你能做到！");
    }
  },8000);
 
@@ -261,8 +275,10 @@ async function startRecognition(){
      $("feedback").textContent="麥克風或語音辨識權限未開啟，請允許後再試一次。";
    }else if(err==="no-speech"||err==="audio-capture"){
      $("feedback").textContent="沒有收到聲音，請再按一次麥克風試試看。";
+     speakAfterRecognition(Math.random()<0.5?"沒關係，你可以再試試看":"加油！我相信你能做到！");
    }else{
      $("feedback").textContent="語音辨識暫時沒有回應，請再按一次麥克風；也可以由老師判定。";
+     speakAfterRecognition(Math.random()<0.5?"沒關係，你可以再試試看":"加油！我相信你能做到！");
    }
  };
  r.onend=()=>{
