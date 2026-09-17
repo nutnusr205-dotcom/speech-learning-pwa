@@ -94,7 +94,7 @@ main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transi
     <div class="field"><label>語詞</label><input id="wordInput" type="text"></div>
     <div class="field"><label>圖片（iPhone 可從照片圖庫／檔案選擇；其他裝置可匯入圖片）</label><input id="imageInput" type="file" accept="image/*"><div style="height:8px"></div><img class="preview" id="preview"></div>
     <div class="field"><label>示範錄音</label>
-      <div class="row"><button class="btn primary" id="recordBtn">🔴 開始錄音</button><button class="btn" id="playBtn"><button id="testFeedbackBtn" type="button">🔊 測試語音回饋</button>▶ 播放錄音</button><button class="btn danger" id="deleteAudio">刪除錄音</button></div>
+      <div class="row"><button class="btn primary" id="recordBtn">🔴 開始錄音</button><button class="btn" id="playBtn">▶ 播放錄音</button><button class="btn danger" id="deleteAudio">刪除錄音</button></div>
       <div class="status" id="recordStatus">尚未錄音</div>
     </div>
     <button class="btn primary" id="saveBtn" style="width:100%">💾 儲存本關設定</button>
@@ -183,20 +183,6 @@ $("imageInput").onchange=e=>{
 };
 $("saveBtn").onclick=()=>{saveProgress();stages[current].word=$("wordInput").value.trim()||stages[current].word;stages[current].image=$("preview").src;try{localStorage.setItem("three-stage-settings",JSON.stringify(stages))}catch(e){alert("圖片或錄音太大，瀏覽器無法完整儲存。可換較小的圖片。")}render();$("feedback").textContent="本關設定已儲存"};
 
-$("testFeedbackBtn").onclick=()=>{
-  const status=$("feedback");
-  status.textContent="正在直接測試語音：「你好棒！」";
-  try{
-    const synth=window.speechSynthesis;
-    synth.cancel(); synth.resume(); refreshZhVoice();
-    const u=new SpeechSynthesisUtterance("你好棒！");
-    u.lang="zh-TW"; if(zhVoice)u.voice=zhVoice; u.rate=.9; u.volume=1;
-    u.onstart=()=>{status.textContent="🔊 測試語音正在播放：你好棒！"};
-    u.onend=()=>{status.textContent="✅ 測試語音播放流程已結束"};
-    u.onerror=e=>{status.textContent="⚠️ 測試語音錯誤："+(e.error||"unknown")};
-    synth.speak(u);
-  }catch(e){status.textContent="⚠️ 無法啟動測試語音："+e.message}
-};
 
 $("recordBtn").onclick=async()=>{
  if(mediaRecorder&&mediaRecorder.state==="recording"){mediaRecorder.stop();return}
@@ -222,50 +208,52 @@ function stopRecognition(){
 
 let feedbackVoiceTimer=null;
 let zhVoice=null;
+let feedbackPrimed=false;
 
 function refreshZhVoice(){
   try{
     const vs=speechSynthesis.getVoices();
-    zhVoice=vs.find(v=>/^zh-TW/i.test(v.lang)) ||
-            vs.find(v=>/^zh/i.test(v.lang)) || null;
+    zhVoice=vs.find(v=>/^zh-TW/i.test(v.lang)) || vs.find(v=>/^zh/i.test(v.lang)) || null;
   }catch(e){}
 }
 refreshZhVoice();
 if("speechSynthesis" in window) speechSynthesis.onvoiceschanged=refreshZhVoice;
 
-function prepareFeedbackAudio(){
-  // Called directly from the mic button's user gesture.
+function primeFeedbackSpeech(){
+  // This runs synchronously from the child's mic-button tap.
+  // A silent utterance keeps the synthesis path associated with that user gesture.
   try{
+    const synth=window.speechSynthesis;
     refreshZhVoice();
-    speechSynthesis.resume();
-    if(navigator.audioSession) navigator.audioSession.type="play-and-record";
-  }catch(e){}
+    synth.cancel(); synth.resume();
+    const u=new SpeechSynthesisUtterance("\u200B");
+    u.lang="zh-TW";
+    if(zhVoice)u.voice=zhVoice;
+    u.volume=0.01; u.rate=1;
+    synth.speak(u);
+    feedbackPrimed=true;
+  }catch(e){feedbackPrimed=false}
 }
 
 function feedbackSpeak(text){
   clearTimeout(feedbackVoiceTimer);
   feedbackVoiceTimer=setTimeout(()=>{
     try{
-      if(navigator.audioSession) navigator.audioSession.type="playback";
       const synth=window.speechSynthesis;
-      synth.cancel();
-      synth.resume();
-      refreshZhVoice();
+      synth.cancel(); synth.resume(); refreshZhVoice();
       const u=new SpeechSynthesisUtterance(text);
       u.lang="zh-TW";
-      if(zhVoice) u.voice=zhVoice;
+      if(zhVoice)u.voice=zhVoice;
       u.rate=.9; u.pitch=1; u.volume=1;
       synth.speak(u);
-      // Safari/iOS sometimes leaves synthesis paused after recognition.
-      setTimeout(()=>{try{synth.resume()}catch(e){}},100);
-      setTimeout(()=>{try{synth.resume()}catch(e){}},350);
+      setTimeout(()=>{try{synth.resume()}catch(e){}},120);
     }catch(e){}
-  },900);
+  },450);
 }
 
 function startRecognition(){
   if(recognitionBusy) return;
-  prepareFeedbackAudio();
+  primeFeedbackSpeech();
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){
     $("feedback").textContent="此瀏覽器目前不支援自動語音辨識。";
