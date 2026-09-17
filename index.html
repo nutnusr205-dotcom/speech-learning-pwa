@@ -163,7 +163,7 @@ function correct(){
 }
 function resetFeedback(){$("feedback").textContent="準備好就開始吧！"}
 $("toggle").onclick=()=>{$("sidebar").classList.toggle("closed")};
-$("targetImg").onclick=()=>{let a=stages[current].audio;if(a)new Audio(a).play();else speak(stages[current].word)};
+$("targetImg").onclick=()=>{stopRecognition();let a=stages[current].audio;if(a){const p=new Audio(a);p.play().catch(()=>{})}else speak(stages[current].word)};
 $("retryBtn").onclick=()=>{resetFeedback();startRecognition()};
 $("wrongBtn").onclick=wrong;$("correctBtn").onclick=correct;
 $("imageInput").onchange=e=>{
@@ -195,15 +195,92 @@ $("recordBtn").onclick=async()=>{
 };
 $("playBtn").onclick=()=>{if(stages[current].audio)new Audio(stages[current].audio).play();else alert("這一關還沒有錄音")};
 $("deleteAudio").onclick=()=>{stages[current].audio=null;$("recordStatus").textContent="錄音已刪除，記得儲存"};
-function startRecognition(){
+let activeRecognition=null, recognitionTimer=null, recognitionBusy=false;
+
+function stopRecognition(){
+ clearTimeout(recognitionTimer);
+ if(activeRecognition){
+   try{activeRecognition.onend=null;activeRecognition.abort()}catch(e){}
+   activeRecognition=null;
+ }
+ recognitionBusy=false;
+ $("micBtn").classList.remove("listening");
+}
+
+async function warmUpMic(){
+ if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+ const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+ await new Promise(r=>setTimeout(r,180));
+ stream.getTracks().forEach(t=>t.stop());
+ await new Promise(r=>setTimeout(r,180));
+}
+
+async function startRecognition(){
+ if(recognitionBusy) return;
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR){$("feedback").textContent="此瀏覽器不支援自動語音辨識，請由老師使用下方按鈕判定。";return}
- const r=new SR();r.lang="zh-TW";r.interimResults=false;r.maxAlternatives=5;
- $("micBtn").classList.add("listening");$("feedback").textContent="我在聽，請說出語詞…";
- r.onresult=e=>{const heard=[...e.results[0]].map(x=>x.transcript.replace(/[，。！？\s]/g,""));const target=stages[current].word.replace(/\s/g,"");heard.some(x=>x.includes(target)||target.includes(x))?correct():wrong()};
- r.onerror=()=>wrong();r.onend=()=>$("micBtn").classList.remove("listening");r.start();
+ if(!SR){
+   $("feedback").textContent="此裝置目前不支援自動語音辨識，請由老師使用下方按鈕判定。";
+   return;
+ }
+ recognitionBusy=true;
+ speechSynthesis.cancel();
+ try{
+   document.querySelectorAll("audio").forEach(a=>{try{a.pause();a.currentTime=0}catch(e){}});
+   await warmUpMic();
+ }catch(e){
+   recognitionBusy=false;
+   $("feedback").textContent="請允許麥克風權限後，再按一次麥克風。";
+   return;
+ }
+
+ const r=new SR(); activeRecognition=r;
+ r.lang="zh-TW"; r.interimResults=false; r.continuous=false; r.maxAlternatives=5;
+ let gotResult=false;
+ $("micBtn").classList.add("listening");
+ $("feedback").textContent="我在聽，請說出語詞…";
+
+ recognitionTimer=setTimeout(()=>{
+   if(!gotResult){
+     stopRecognition();
+     $("feedback").textContent="剛剛沒有收到聲音，請再按一次麥克風試試看。";
+     speak("沒關係，請再試一次");
+   }
+ },8000);
+
+ r.onresult=e=>{
+   gotResult=true; clearTimeout(recognitionTimer);
+   const heard=[...e.results[0]].map(x=>x.transcript.replace(/[，。！？\s]/g,""));
+   const target=stages[current].word.replace(/\s/g,"");
+   stopRecognition();
+   heard.some(x=>x.includes(target)||target.includes(x))?correct():wrong();
+ };
+ r.onerror=e=>{
+   clearTimeout(recognitionTimer);
+   const err=e.error; stopRecognition();
+   if(err==="not-allowed"||err==="service-not-allowed"){
+     $("feedback").textContent="麥克風或語音辨識權限未開啟，請允許後再試一次。";
+   }else if(err==="no-speech"||err==="audio-capture"){
+     $("feedback").textContent="沒有收到聲音，請再按一次麥克風試試看。";
+   }else{
+     $("feedback").textContent="語音辨識暫時沒有回應，請再按一次麥克風；也可以由老師判定。";
+   }
+ };
+ r.onend=()=>{
+   if(!gotResult && activeRecognition===r){
+     clearTimeout(recognitionTimer); activeRecognition=null; recognitionBusy=false;
+     $("micBtn").classList.remove("listening");
+     if($("feedback").textContent==="我在聽，請說出語詞…")
+       $("feedback").textContent="沒有收到辨識結果，請再按一次麥克風試試看。";
+   }
+ };
+ try{r.start()}catch(e){
+   stopRecognition();
+   $("feedback").textContent="麥克風正在重新準備，請再按一次試試看。";
+ }
 }
 $("micBtn").onclick=startRecognition;
+window.addEventListener("pagehide",stopRecognition);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)stopRecognition();});
 render();
 </script>
 
