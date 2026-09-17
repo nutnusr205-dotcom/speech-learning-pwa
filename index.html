@@ -193,7 +193,7 @@ function correct(){
  ding();
  feedbackSpeak(Math.random()<.5?"答對了！":"你好棒！");
  const old=current; render();
- if(old<2)setTimeout(()=>{current=old+1;resetFeedback();render()},1800);
+ if(old<stages.length-1)setTimeout(()=>{current=old+1;resetFeedback();render()},1800);
  else setTimeout(()=>{$("feedback").textContent="十關都完成了！你好棒！";feedbackSpeak("十關都完成了！你好棒！")},1500)
 }
 function resetFeedback(){$("feedback").textContent="準備好就開始吧！"}
