@@ -111,7 +111,7 @@ main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transi
 </div>
 <div class="app">
 <aside class="sidebar closed" id="sidebar">
-  <h2>👩‍🏫 老師編輯區</h2>
+  <h2>👩‍🏫 老師編輯區 <span style="font-size:12px;color:#7b8794">V17</span></h2>
   <div class="hint">每一關都可以更換圖片、修改語詞，並錄製「點圖片時要播放」的示範語音。設定會保存在這台裝置的瀏覽器中。</div>
   <div class="editor">
     <h3 id="editTitle">編輯第一關</h3>
@@ -122,6 +122,25 @@ main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transi
       <div class="status" id="recordStatus">尚未錄音</div>
     </div>
     <button class="btn primary" id="saveBtn" style="width:100%">💾 儲存本關設定</button>
+  </div>
+
+  <div class="editor" id="voiceEditor">
+    <h3>🔊 獎勵語音設定</h3>
+    <div class="field">
+      <label>獎勵語音</label>
+      <select id="voiceSelect" style="width:100%;padding:10px;border:1px solid #cbd8e6;border-radius:10px;background:white"></select>
+    </div>
+    <button class="btn" type="button" id="voiceTestBtn" style="width:100%">▶ 試聽「你好棒！」</button>
+    <div class="field" style="margin-top:12px">
+      <label>語速</label>
+      <select id="voiceRate" style="width:100%;padding:10px;border:1px solid #cbd8e6;border-radius:10px;background:white">
+        <option value="0.7">0.7 慢</option>
+        <option value="0.8" selected>0.8 適中</option>
+        <option value="0.9">0.9</option>
+        <option value="1">1.0 一般</option>
+      </select>
+    </div>
+    <div class="hint">每台 iPhone／iPad 可用的中文聲音可能不同。請按「試聽」後選擇最適合的聲音；選擇會儲存在這台裝置。</div>
   </div>
   <div class="editor">
     <h3>辨識設定</h3>
