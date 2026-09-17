@@ -79,7 +79,31 @@ main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transi
   .feedback{min-height:52px;margin-top:8px;font-size:20px}
 }
 </style>
-</head>
+<style>
+#stageBar.top{
+  display:flex;
+  justify-content:flex-start;
+  gap:10px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+  padding:4px 8px 12px 48px;
+  margin-bottom:16px;
+  scrollbar-width:thin;
+}
+#stageBar .stage-thumb{
+  flex:0 0 108px;
+  width:108px;
+  min-width:108px;
+  scroll-snap-align:start;
+}
+@media(max-width:600px){
+  #stageBar.top{gap:8px;padding-left:48px;padding-right:12px}
+  #stageBar .stage-thumb{flex-basis:92px;width:92px;min-width:92px}
+  #stageBar .stage-thumb img{height:48px}
+}
+</style></head>
 <body>
 <div class="pwa-tools">
 <button class="pwa-install" id="installApp">＋ 安裝 App</button>
@@ -138,17 +162,24 @@ let stages=[
 ];
 let current=0,done=Array(10).fill(false),mediaRecorder,chunks=[],audioURL=null;
 try{
- const s=JSON.parse(localStorage.getItem("three-stage-settings")); if(s) stages=s;
+ const s=JSON.parse(localStorage.getItem("three-stage-settings"));
+ if(Array.isArray(s)) s.forEach((item,i)=>{if(i<10&&item) stages[i]={...stages[i],...item}});
  localStorage.removeItem("three-stage-progress");
 }catch(e){}
 function saveProgress(){ /* student progress is session-only */ }
 const $=id=>document.getElementById(id);
+function keepActiveThumbVisible(){
+ requestAnimationFrame(()=>{
+  const a=document.querySelector(".stage-thumb.active");
+  if(a) a.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+ });
+}
 function render(){
- $("stageBar").innerHTML=stages.map((s,i)=>`<button class="stage-thumb ${i===current?"active":""} ${done[i]?"done":""}" data-i="${i}"><img src="${s.image}"><span>${done[i]?"✓ ":""}第${["一","二","三"][i]}關</span></button>`).join("");
- document.querySelectorAll(".stage-thumb").forEach(b=>b.onclick=()=>{current=+b.dataset.i; saveProgress(); resetFeedback(); render();});
- $("badge").textContent=`第${["一","二","三"][current]}關`;
+ $("stageBar").innerHTML=stages.map((s,i)=>`<button class="stage-thumb ${i===current?"active":""} ${done[i]?"done":""}" data-i="${i}"><img src="${s.image}"><span>${done[i]?"✓ ":""}第${i+1}關</span></button>`).join("");
+ document.querySelectorAll(".stage-thumb").forEach(b=>b.onclick=()=>{current=+b.dataset.i; saveProgress(); resetFeedback(); render();}); keepActiveThumbVisible();
+ $("badge").textContent=`第${current+1}關`;
  $("targetImg").src=stages[current].image;$("targetWord").textContent=stages[current].word;
- $("editTitle").textContent=`編輯第${["一","二","三"][current]}關`;
+ $("editTitle").textContent=`編輯第${current+1}關`;
  $("wordInput").value=stages[current].word;$("preview").src=stages[current].image;
  $("recordStatus").textContent=stages[current].audio?"已有錄音，可播放或重新錄製":"尚未錄音";
 }
