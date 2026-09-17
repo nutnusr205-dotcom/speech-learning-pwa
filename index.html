@@ -205,28 +205,51 @@ function stopRecognition(){
 }
 
 let feedbackVoiceTimer=null;
+let zhVoice=null;
+
+function refreshZhVoice(){
+  try{
+    const vs=speechSynthesis.getVoices();
+    zhVoice=vs.find(v=>/^zh-TW/i.test(v.lang)) ||
+            vs.find(v=>/^zh/i.test(v.lang)) || null;
+  }catch(e){}
+}
+refreshZhVoice();
+if("speechSynthesis" in window) speechSynthesis.onvoiceschanged=refreshZhVoice;
+
+function prepareFeedbackAudio(){
+  // Called directly from the mic button's user gesture.
+  try{
+    refreshZhVoice();
+    speechSynthesis.resume();
+    if(navigator.audioSession) navigator.audioSession.type="play-and-record";
+  }catch(e){}
+}
+
 function feedbackSpeak(text){
   clearTimeout(feedbackVoiceTimer);
   feedbackVoiceTimer=setTimeout(()=>{
     try{
+      if(navigator.audioSession) navigator.audioSession.type="playback";
       const synth=window.speechSynthesis;
       synth.cancel();
       synth.resume();
+      refreshZhVoice();
       const u=new SpeechSynthesisUtterance(text);
       u.lang="zh-TW";
-      u.rate=.92;
-      u.volume=1;
-      u.onstart=()=>{};
-      u.onerror=()=>{};
+      if(zhVoice) u.voice=zhVoice;
+      u.rate=.9; u.pitch=1; u.volume=1;
       synth.speak(u);
-      // iOS occasionally leaves the synthesizer paused after recognition.
-      setTimeout(()=>{try{synth.resume()}catch(e){}},120);
+      // Safari/iOS sometimes leaves synthesis paused after recognition.
+      setTimeout(()=>{try{synth.resume()}catch(e){}},100);
+      setTimeout(()=>{try{synth.resume()}catch(e){}},350);
     }catch(e){}
-  },700);
+  },900);
 }
 
 function startRecognition(){
   if(recognitionBusy) return;
+  prepareFeedbackAudio();
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){
     $("feedback").textContent="此瀏覽器目前不支援自動語音辨識。";
@@ -285,7 +308,10 @@ function startRecognition(){
     wrong();
   };
 
-  try{r.start()}catch(e){
+  try{
+    if(navigator.audioSession) navigator.audioSession.type="play-and-record";
+    r.start();
+  }catch(e){
     settled=true; finish();
     $("feedback").textContent="語音辨識正在重新準備，請再按一次麥克風。";
   }
