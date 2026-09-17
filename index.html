@@ -132,15 +132,9 @@ let stages=[
 let current=0,done=[false,false,false],mediaRecorder,chunks=[],audioURL=null;
 try{
  const s=JSON.parse(localStorage.getItem("three-stage-settings")); if(s) stages=s;
- const p=JSON.parse(localStorage.getItem("three-stage-progress"));
- if(p){
-   if(Number.isInteger(p.current) && p.current>=0 && p.current<3) current=p.current;
-   if(Array.isArray(p.done) && p.done.length===3) done=p.done.map(Boolean);
- }
+ localStorage.removeItem("three-stage-progress");
 }catch(e){}
-function saveProgress(){
- try{localStorage.setItem("three-stage-progress",JSON.stringify({current,done}));}catch(e){}
-}
+function saveProgress(){ /* student progress is session-only */ }
 const $=id=>document.getElementById(id);
 function render(){
  $("stageBar").innerHTML=stages.map((s,i)=>`<button class="stage-thumb ${i===current?"active":""} ${done[i]?"done":""}" data-i="${i}"><img src="${s.image}"><span>${done[i]?"✓ ":""}第${["一","二","三"][i]}關</span></button>`).join("");
@@ -153,13 +147,16 @@ function render(){
 }
 function speak(text){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="zh-TW";u.rate=.92;speechSynthesis.speak(u)}
 function ding(){const A=window.AudioContext||window.webkitAudioContext;const c=new A(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.25,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.35);o.start();o.stop(c.currentTime+.35)}
-function wrong(){const arr=["沒關係，你可以再試試看","加油！我相信你能做到！"];const t=arr[Math.floor(Math.random()*arr.length)];$("feedback").textContent=t;speak(t)}
+function wrong(){const arr=["沒關係，你可以再試試看","加油！我相信你能做到！"];const t=arr[Math.floor(Math.random()*arr.length)];$("feedback").textContent=t;feedbackSpeak(t)}
 function correct(){
- if(done[current])return;done[current]=true;saveProgress();$("feedback").innerHTML='<div><div class="check">✔</div><div>答對了！</div></div>';ding();
- setTimeout(()=>speak(Math.random()<.5?"答對了！":"你好棒！"),250);
+ if(done[current])return;
+ done[current]=true;
+ $("feedback").innerHTML='<div><div class="check">✔</div><div>答對了！</div></div>';
+ ding();
+ feedbackSpeak(Math.random()<.5?"答對了！":"你好棒！");
  const old=current; render();
- if(old<2)setTimeout(()=>{current=old+1;saveProgress();resetFeedback();render()},1800);
- else setTimeout(()=>{$("feedback").textContent="三關都完成了！你好棒！";speak("三關都完成了！你好棒！")},1500)
+ if(old<2)setTimeout(()=>{current=old+1;resetFeedback();render()},1800);
+ else setTimeout(()=>{$("feedback").textContent="三關都完成了！你好棒！";feedbackSpeak("三關都完成了！你好棒！")},1500)
 }
 function resetFeedback(){$("feedback").textContent="準備好就開始吧！"}
 $("toggle").onclick=()=>{$("sidebar").classList.toggle("closed")};
@@ -198,101 +195,90 @@ $("deleteAudio").onclick=()=>{stages[current].audio=null;$("recordStatus").textC
 let activeRecognition=null, recognitionTimer=null, recognitionBusy=false;
 
 function stopRecognition(){
- clearTimeout(recognitionTimer);
- if(activeRecognition){
-   try{activeRecognition.onend=null;activeRecognition.abort()}catch(e){}
-   activeRecognition=null;
- }
- recognitionBusy=false;
- $("micBtn").classList.remove("listening");
+  clearTimeout(recognitionTimer);
+  if(activeRecognition){
+    try{activeRecognition.abort()}catch(e){}
+    activeRecognition=null;
+  }
+  recognitionBusy=false;
+  $("micBtn").classList.remove("listening");
 }
 
-
-function speakAfterRecognition(text, delay=320){
-  stopRecognition();
+function feedbackSpeak(text){
   setTimeout(()=>{
     try{
       speechSynthesis.cancel();
       const u=new SpeechSynthesisUtterance(text);
-      u.lang="zh-TW";
-      u.rate=0.92;
+      u.lang="zh-TW"; u.rate=.92;
       speechSynthesis.speak(u);
     }catch(e){}
-  },delay);
+  },350);
 }
 
-async function warmUpMic(){
- if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
- const stream=await navigator.mediaDevices.getUserMedia({audio:true});
- await new Promise(r=>setTimeout(r,180));
- stream.getTracks().forEach(t=>t.stop());
- await new Promise(r=>setTimeout(r,180));
-}
+function startRecognition(){
+  if(recognitionBusy) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){
+    $("feedback").textContent="此瀏覽器目前不支援自動語音辨識。";
+    return;
+  }
 
-async function startRecognition(){
- if(recognitionBusy) return;
- const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!SR){
-   $("feedback").textContent="此裝置目前不支援自動語音辨識，請由老師使用下方按鈕判定。";
-   return;
- }
- recognitionBusy=true;
- speechSynthesis.cancel();
- try{
-   document.querySelectorAll("audio").forEach(a=>{try{a.pause();a.currentTime=0}catch(e){}});
-   await warmUpMic();
- }catch(e){
-   recognitionBusy=false;
-   $("feedback").textContent="請允許麥克風權限後，再按一次麥克風。";
-   return;
- }
+  // Start from a clean recognition state. Do NOT open getUserMedia separately.
+  stopRecognition();
+  try{speechSynthesis.cancel()}catch(e){}
 
- const r=new SR(); activeRecognition=r;
- r.lang="zh-TW"; r.interimResults=false; r.continuous=false; r.maxAlternatives=5;
- let gotResult=false;
- $("micBtn").classList.add("listening");
- $("feedback").textContent="我在聽，請說出語詞…";
+  const r=new SR();
+  activeRecognition=r; recognitionBusy=true;
+  r.lang="zh-TW"; r.interimResults=false; r.continuous=false; r.maxAlternatives=5;
+  let settled=false;
 
- recognitionTimer=setTimeout(()=>{
-   if(!gotResult){
-     stopRecognition();
-     $("feedback").textContent="剛剛沒有收到聲音，請再按一次麥克風試試看。";
-     speakAfterRecognition(Math.random()<0.5?"沒關係，你可以再試試看":"加油！我相信你能做到！");
-   }
- },8000);
+  $("micBtn").classList.add("listening");
+  $("feedback").textContent="我在聽，請說出語詞…";
 
- r.onresult=e=>{
-   gotResult=true; clearTimeout(recognitionTimer);
-   const heard=[...e.results[0]].map(x=>x.transcript.replace(/[，。！？\s]/g,""));
-   const target=stages[current].word.replace(/\s/g,"");
-   stopRecognition();
-   heard.some(x=>x.includes(target)||target.includes(x))?correct():wrong();
- };
- r.onerror=e=>{
-   clearTimeout(recognitionTimer);
-   const err=e.error; stopRecognition();
-   if(err==="not-allowed"||err==="service-not-allowed"){
-     $("feedback").textContent="麥克風或語音辨識權限未開啟，請允許後再試一次。";
-   }else if(err==="no-speech"||err==="audio-capture"){
-     $("feedback").textContent="沒有收到聲音，請再按一次麥克風試試看。";
-     speakAfterRecognition(Math.random()<0.5?"沒關係，你可以再試試看":"加油！我相信你能做到！");
-   }else{
-     $("feedback").textContent="語音辨識暫時沒有回應，請再按一次麥克風；也可以由老師判定。";
-     speakAfterRecognition(Math.random()<0.5?"沒關係，你可以再試試看":"加油！我相信你能做到！");
-   }
- };
- r.onend=()=>{
-   if(!gotResult && activeRecognition===r){
-     clearTimeout(recognitionTimer); activeRecognition=null; recognitionBusy=false;
-     $("micBtn").classList.remove("listening");
-     if($("feedback").textContent==="我在聽，請說出語詞…")
-       $("feedback").textContent="沒有收到辨識結果，請再按一次麥克風試試看。";
-   }
- };
- try{r.start()}catch(e){
-   stopRecognition();
-   $("feedback").textContent="麥克風正在重新準備，請再按一次試試看。";
- }
+  const finish=()=>{
+    clearTimeout(recognitionTimer);
+    if(activeRecognition===r) activeRecognition=null;
+    recognitionBusy=false;
+    $("micBtn").classList.remove("listening");
+  };
+
+  recognitionTimer=setTimeout(()=>{
+    if(settled) return;
+    settled=true;
+    try{r.abort()}catch(e){}
+    finish();
+    wrong();
+  },7000);
+
+  r.onresult=e=>{
+    if(settled) return;
+    settled=true;
+    const heard=Array.from(e.results[0]).map(x=>x.transcript.replace(/[，。！？、\s]/g,""));
+    const target=stages[current].word.replace(/[，。！？、\s]/g,"");
+    finish();
+    heard.some(x=>x.includes(target)||target.includes(x)) ? correct() : wrong();
+  };
+
+  r.onerror=e=>{
+    if(settled) return;
+    settled=true; finish();
+    if(e.error==="not-allowed"||e.error==="service-not-allowed"){
+      $("feedback").textContent="請允許麥克風與語音辨識權限後再試一次。";
+    }else{
+      wrong();
+    }
+  };
+
+  r.onend=()=>{
+    if(settled) return;
+    settled=true; finish();
+    wrong();
+  };
+
+  try{r.start()}catch(e){
+    settled=true; finish();
+    $("feedback").textContent="語音辨識正在重新準備，請再按一次麥克風。";
+  }
 }
 $("micBtn").onclick=startRecognition;
 window.addEventListener("pagehide",stopRecognition);
