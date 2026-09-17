@@ -94,7 +94,7 @@ main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transi
     <div class="field"><label>語詞</label><input id="wordInput" type="text"></div>
     <div class="field"><label>圖片（iPhone 可從照片圖庫／檔案選擇；其他裝置可匯入圖片）</label><input id="imageInput" type="file" accept="image/*"><div style="height:8px"></div><img class="preview" id="preview"></div>
     <div class="field"><label>示範錄音</label>
-      <div class="row"><button class="btn primary" id="recordBtn">🔴 開始錄音</button><button class="btn" id="playBtn">▶ 播放錄音</button><button class="btn danger" id="deleteAudio">刪除錄音</button></div>
+      <div class="row"><button class="btn primary" id="recordBtn">🔴 開始錄音</button><button class="btn" id="playBtn"><button id="testFeedbackBtn" type="button">🔊 測試語音回饋</button>▶ 播放錄音</button><button class="btn danger" id="deleteAudio">刪除錄音</button></div>
       <div class="status" id="recordStatus">尚未錄音</div>
     </div>
     <button class="btn primary" id="saveBtn" style="width:100%">💾 儲存本關設定</button>
@@ -182,54 +182,31 @@ $("imageInput").onchange=e=>{
  r.readAsDataURL(f)
 };
 $("saveBtn").onclick=()=>{saveProgress();stages[current].word=$("wordInput").value.trim()||stages[current].word;stages[current].image=$("preview").src;try{localStorage.setItem("three-stage-settings",JSON.stringify(stages))}catch(e){alert("圖片或錄音太大，瀏覽器無法完整儲存。可換較小的圖片。")}render();$("feedback").textContent="本關設定已儲存"};
+
+$("testFeedbackBtn").onclick=()=>{
+  const status=$("feedback");
+  status.textContent="正在直接測試語音：「你好棒！」";
+  try{
+    const synth=window.speechSynthesis;
+    synth.cancel(); synth.resume(); refreshZhVoice();
+    const u=new SpeechSynthesisUtterance("你好棒！");
+    u.lang="zh-TW"; if(zhVoice)u.voice=zhVoice; u.rate=.9; u.volume=1;
+    u.onstart=()=>{status.textContent="🔊 測試語音正在播放：你好棒！"};
+    u.onend=()=>{status.textContent="✅ 測試語音播放流程已結束"};
+    u.onerror=e=>{status.textContent="⚠️ 測試語音錯誤："+(e.error||"unknown")};
+    synth.speak(u);
+  }catch(e){status.textContent="⚠️ 無法啟動測試語音："+e.message}
+};
+
 $("recordBtn").onclick=async()=>{
  if(mediaRecorder&&mediaRecorder.state==="recording"){mediaRecorder.stop();return}
  try{
-   stopRecognition();
-   try{speechSynthesis.cancel()}catch(e){}
-   if(navigator.audioSession) navigator.audioSession.type="play-and-record";
-   recordingStream=await navigator.mediaDevices.getUserMedia({audio:true});
-   chunks=[];
-   mediaRecorder=new MediaRecorder(recordingStream);
-   mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-   mediaRecorder.onstop=()=>{
-     const mime=mediaRecorder.mimeType||"audio/mp4";
-     const blob=new Blob(chunks,{type:mime});
-     // IMPORTANT on iPhone: fully release teacher-recording microphone first.
-     if(recordingStream){
-       recordingStream.getTracks().forEach(t=>{try{t.stop()}catch(e){}});
-       recordingStream=null;
-     }
-     mediaRecorder=null;
-     try{
-       if(navigator.audioSession) navigator.audioSession.type="playback";
-       speechSynthesis.resume();
-     }catch(e){}
-     const r=new FileReader();
-     r.onload=()=>{
-       stages[current].audio=r.result;
-       $("recordStatus").textContent="錄音完成，記得按「儲存本關設定」";
-       $("recordBtn").textContent="🔴 開始錄音";
-       // Give WebKit time to leave the recording audio session.
-       setTimeout(()=>{
-         try{
-           if(navigator.audioSession) navigator.audioSession.type="playback";
-           speechSynthesis.resume();
-         }catch(e){}
-       },500);
-     };
-     r.readAsDataURL(blob);
-   };
-   mediaRecorder.start();
-   $("recordBtn").textContent="⏹ 停止錄音";
-   $("recordStatus").textContent="錄音中…";
- }catch(e){
-   if(recordingStream){recordingStream.getTracks().forEach(t=>t.stop());recordingStream=null}
-   try{if(navigator.audioSession) navigator.audioSession.type="playback"}catch(x){}
-   alert("無法使用麥克風，請確認瀏覽器已允許麥克風權限。");
- }
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];mediaRecorder=new MediaRecorder(stream);
+  mediaRecorder.ondataavailable=e=>chunks.push(e.data);mediaRecorder.onstop=()=>{const blob=new Blob(chunks,{type:mediaRecorder.mimeType});const r=new FileReader();r.onload=()=>{stages[current].audio=r.result;$("recordStatus").textContent="錄音完成，記得按「儲存本關設定」";$("recordBtn").textContent="🔴 開始錄音"};r.readAsDataURL(blob);stream.getTracks().forEach(t=>t.stop())};
+  mediaRecorder.start();$("recordBtn").textContent="⏹ 停止錄音";$("recordStatus").textContent="錄音中…";
+ }catch(e){alert("無法使用麥克風，請確認瀏覽器已允許麥克風權限。")}
 };
-$("playBtn").onclick=()=>{if(stages[current].audio){try{if(navigator.audioSession)navigator.audioSession.type="playback"}catch(e){};const a=new Audio(stages[current].audio);a.play().catch(()=>{})}else alert("這一關還沒有錄音")};
+$("playBtn").onclick=()=>{if(stages[current].audio)new Audio(stages[current].audio).play();else alert("這一關還沒有錄音")};
 $("deleteAudio").onclick=()=>{stages[current].audio=null;$("recordStatus").textContent="錄音已刪除，記得儲存"};
 let activeRecognition=null, recognitionTimer=null, recognitionBusy=false;
 
