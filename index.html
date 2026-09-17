@@ -204,15 +204,25 @@ function stopRecognition(){
   $("micBtn").classList.remove("listening");
 }
 
+let feedbackVoiceTimer=null;
 function feedbackSpeak(text){
-  setTimeout(()=>{
+  clearTimeout(feedbackVoiceTimer);
+  feedbackVoiceTimer=setTimeout(()=>{
     try{
-      speechSynthesis.cancel();
+      const synth=window.speechSynthesis;
+      synth.cancel();
+      synth.resume();
       const u=new SpeechSynthesisUtterance(text);
-      u.lang="zh-TW"; u.rate=.92;
-      speechSynthesis.speak(u);
+      u.lang="zh-TW";
+      u.rate=.92;
+      u.volume=1;
+      u.onstart=()=>{};
+      u.onerror=()=>{};
+      synth.speak(u);
+      // iOS occasionally leaves the synthesizer paused after recognition.
+      setTimeout(()=>{try{synth.resume()}catch(e){}},120);
     }catch(e){}
-  },350);
+  },700);
 }
 
 function startRecognition(){
