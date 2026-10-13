@@ -111,7 +111,7 @@ main{width:100%;min-height:100vh;padding:22px 24px 40px;margin-left:310px;transi
 </div>
 <div class="app">
 <aside class="sidebar closed" id="sidebar">
-  <h2>👩‍🏫 老師編輯區 <span style="font-size:12px;color:#7b8794">V21</span></h2>
+  <h2>👩‍🏫 老師編輯區 <span style="font-size:12px;color:#7b8794">V22</span></h2>
   <div class="hint">每一關都可以更換圖片、修改語詞，並錄製「點圖片時要播放」的示範語音。設定會保存在這台裝置的瀏覽器中。</div>
   <div class="editor">
     <h3 id="editTitle">編輯第一關</h3>
@@ -378,9 +378,27 @@ function feedbackSpeak(text){
   },450);
 }
 
+function normalizeSpeech(text){
+  return String(text||"").normalize("NFKC").toLowerCase()
+    .replace(/[，。！？、\s\-—,.!?：:「」『』（）()]/g,"")
+    .replace(/臺/g,"台").replace(/裏/g,"裡");
+}
+function recognitionMatches(heard,target){
+  const t=normalizeSpeech(target);
+  if(!t)return false;
+  return heard.some(v=>{
+    const h=normalizeSpeech(v);
+    if(!h)return false;
+    return h===t || (t.length>=2 && h.includes(t)) || (h.length>=2 && t.includes(h));
+  });
+}
 function startRecognition(){
   if(recognitionBusy) return;
   primeFeedbackSpeech();
+  if(/^第[4-9]關$/.test(stages[current].word)){
+    $("feedback").textContent="提醒：本關仍是預設名稱「"+stages[current].word+"」。請先在老師編輯區輸入小朋友要說的語詞，並按「儲存本關設定」。";
+    return;
+  }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){
     $("feedback").textContent="此瀏覽器目前不支援自動語音辨識。";
@@ -417,10 +435,19 @@ function startRecognition(){
   r.onresult=e=>{
     if(settled) return;
     settled=true;
-    const heard=Array.from(e.results[0]).map(x=>x.transcript.replace(/[，。！？、\s]/g,""));
-    const target=stages[current].word.replace(/[，。！？、\s]/g,"");
+    const heard=Array.from(e.results[0]).map(x=>x.transcript);
+    const target=stages[current].word;
     finish();
-    heard.some(x=>x.includes(target)||target.includes(x)) ? correct() : wrong();
+    if(recognitionMatches(heard,target)){
+      correct();
+    }else{
+      wrong();
+      const detail=document.createElement("div");
+      detail.className="small";
+      detail.style.marginTop="8px";
+      detail.textContent=`辨識結果：${heard.join("／") || "（未辨識到文字）"}｜目標語詞：${target}。可再試一次，或由老師判定。`;
+      $("feedback").appendChild(detail);
+    }
   };
 
   r.onerror=e=>{
